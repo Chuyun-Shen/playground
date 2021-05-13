@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
+import action_prune
 
 
 # import matplotlib
@@ -65,7 +66,10 @@ class Leif(agents.BaseAgent):
             board_cent, bbs_cent, bl_cent,
             o['blast_strength'], o['can_kick'], o['ammo']), axis=None)
 
+
+
     def act(self, obs, action_space):
+        actions = action_prune.get_filtered_actions(obs)
         obs = self.translate_obs(obs)
         # print("hidden", len(self.hidden), len(self.hidden[-1]))
         last_hn, last_cn = self.hidden[-1][0], self.hidden[-1][1]
@@ -79,7 +83,20 @@ class Leif(agents.BaseAgent):
             if self.debug:
                 print("hn mean:", hn.mean(), "hn std:", hn.std(), "cn mean:", cn.mean(), "cn std:", cn.std())
 
-            probs_softmaxed = F.softmax(probs, dim=-1)
+
+            def filter_probs(probs, av_list, all_list=None):
+                if all_list is None:
+                    all_list = [0, 1, 2, 3, 4, 5]
+                av_probs = torch.tensor([probs[0][i] for i in av_list])
+                probs_softmaxed = F.softmax(av_probs, dim=-1)
+                av_probs_softmaxed = torch.tensor([[0.0 for _ in all_list]])
+                for i in range(len(av_list)):
+                    av_probs_softmaxed[0][av_list[i]] = probs_softmaxed[i]
+                return av_probs_softmaxed
+
+            probs_softmaxed = filter_probs(probs, actions)
+            # probs_softmaxed = F.softmax(probs, dim=-1)
+            # print("debugs", probs_softmaxed)
 
             if self.stochastic:
                 action = Categorical(probs_softmaxed).sample().item()
