@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
-import A2C.action_prune
+from A2C import action_prune
 
 
 # import matplotlib
